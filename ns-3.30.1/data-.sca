@@ -1,0 +1,20 @@
+run 
+attr experiment "DSR-routing-test"
+attr strategy "wifi-default"
+attr measurement ""
+attr description ""
+attr "author" "Özgür"
+
+scalar . measurement ""
+scalar . "author" "Özgür"
+scalar node-3 DSR-appTx-packets 494
+scalar node-5 DSR-rx-packets 494
+scalar node-9 DSR-appTx-packets 476
+scalar node-0 DSR-rx-packets 371
+scalar * delay-count 865
+scalar * delay-total 4269318718
+scalar * delay-average 4935628
+scalar * delay-max 275521395
+scalar * delay-min 3302621
+
+
