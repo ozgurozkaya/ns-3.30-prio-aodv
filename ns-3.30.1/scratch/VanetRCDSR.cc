@@ -104,17 +104,16 @@ class RoutingExample{
     // argc & argv configuration
     void configuration(int argc, char ** argv);
     // Number of nodes
-    uint32_t size = 50;
-    uint32_t meters = 1000;
+    uint32_t size = 10;
     // Seed Value
-    uint32_t seed = 1001;
+    uint32_t seed = 1;
     // Number of Connections
-    uint32_t connections = 10;
+    uint32_t connections = 1;
     // Seconds of Connections
     double total_connection_time = 0;
-    Ptr<PacketCounterCalculator> totalRx[1000];
-    Ptr<CounterCalculator<uint32_t> > totalTx[1000];
-    Ptr<TimeMinMaxAvgTotalCalculator> delayStat[1000];
+    Ptr<PacketCounterCalculator> totalRx[50];
+    Ptr<CounterCalculator<uint32_t> > totalTx[50];
+    Ptr<TimeMinMaxAvgTotalCalculator> delayStat[50];
     DataCollector data;
 
   private:
@@ -127,18 +126,19 @@ class RoutingExample{
     double duration;
     // Write per-device PCAP traces if true & net-anim file generate
     bool pcap = true;
+    bool anim = false;
     // Print routes if true
     bool printRoutes = false;
     //Size of Packet (bytes), Packet interval (Time), Max Packets
-    double packet_size = 512;
+    double packet_size = 1024;
     //Time packet_interval = MilliSeconds (1000);
     //double max_packets = 250;
-    StringValue data_rate = StringValue("5Kb/s");
-    double data_rate_2 = 5;
+    StringValue data_rate = StringValue("150Kb/s");
+    double data_rate_2 = 150;
     //Internet Stack Helper
     InternetStackHelper stack;
     //Pointer to the packet sink application 
-    Ptr<PacketSink> sink[1000];
+    Ptr<PacketSink> sink[50];
     //The value of the last total received bytes
     uint64_t lastTotalRx = 0;
     //Routing Method
@@ -176,8 +176,7 @@ class RoutingExample{
 
 void
 RoutingExample::run(){
-  RngSeedManager::SetSeed(seed);
-
+  
   createNodes(size);
   createDevices();
   installInternetStack();
@@ -192,9 +191,8 @@ RoutingExample::run(){
   file_path += std::to_string(connections);
   file_path += ".xml";
 
-  //std::string animFile = "xml/animation-AODV.xml";
+  //std::string animFile = "xml/animation.xml";
   //AnimationInterface animation (animFile);
-  //animation.SetMaxPktsPerTraceFile(500000);
 
   //Simulator::Schedule(Seconds(20), &changePosition, nodes.Get(0), Vector(500,500,0));
   Simulator::Stop (Seconds (totalTime));
@@ -261,7 +259,7 @@ RoutingExample::run(){
       // We are only interested in the metrics of the data flows. This AODV
       // implementation create other flows with routing information at low bitrates,
       // so a margin is defined to ensure that only our data flows are filtered.
-      if ( (!t.destinationAddress.IsSubnetDirectedBroadcast("255.255.255.0")) && (txbitrate_value > 5/1.2) && (rxbitrate_value < 5*1.2)  && txbitrate_value != inf)
+      if ( (!t.destinationAddress.IsSubnetDirectedBroadcast("255.255.255.0")) && (txbitrate_value > 150/1.2) && (rxbitrate_value < 150*1.2)  && txbitrate_value != inf)
       {
           k++;
           std::cout << "\nFlow " << k << " (" << t.sourceAddress << " -> "
@@ -327,7 +325,7 @@ RoutingExample::run(){
   // file pointer 
   std::fstream fout; 
   // opens an existing csv file or creates a new file. 
-  fout.open("xml/VanetRCAODV-report-flowmonitor.csv", std::ios::out | std::ios::app);
+  fout.open("xml/VanetRCDSR-report-flowmonitor.csv", std::ios::out | std::ios::app);
   fout << connections << "," << seed << "," << pdf_total << "," << rxbitrate_total << "," << delay_total << "\n";
   fout.close();
   
@@ -344,13 +342,13 @@ RoutingExample::run(){
   output->Output(data);
 
   data_rate_2 = data_rate_2 * 1000; // turning Kb to bits
-  double pdf_total_statsModule = delayStat[0]->GetTotal() / floor(total_connection_time * (data_rate_2 / (packet_size * 8))) * 100;
+  double pdf_total_statsModule = delayStat[0]->GetTotal() / (total_connection_time * (data_rate_2 / (packet_size * 8))) * 100;
   std::cout << "\n" << total_connection_time << "\n" << pdf_total_statsModule << "\n";
   
   // file pointer 
   std::fstream fout2; 
   // opens an existing csv file or creates a new file. 
-  fout2.open("xml/VanetRCAODV-report-statsModule.csv", std::ios::out | std::ios::app);
+  fout2.open("xml/VanetRCDSR-report-statsModule.csv", std::ios::out | std::ios::app);
   fout2 << connections << "," << seed << "," << pdf_total_statsModule << "," << "0" << "," << delayStat[0]->GetAverage().GetSeconds() << "\n";
 
   Simulator::Destroy ();
@@ -361,72 +359,65 @@ void RoutingExample::configuration(int argc, char ** argv){
   cmd.AddValue("size", "Number of nodes", size);
   cmd.AddValue("seed", "Value of seed", seed);
   cmd.AddValue("connections", "Number of connections", connections);
-  cmd.AddValue("meters", "One side of square as meters", meters);
   cmd.Parse (argc, argv);
 }
 
 void
 RoutingExample::createNodes(int i){
+  Config::SetDefault ("ns3::RandomWalk2dMobilityModel::Mode", StringValue ("Time"));
+  Config::SetDefault ("ns3::RandomWalk2dMobilityModel::Time", StringValue ("2s"));
+  Config::SetDefault ("ns3::RandomWalk2dMobilityModel::Speed", StringValue ("ns3::ConstantRandomVariable[Constant=2.0]"));
+  //Config::SetDefault ("ns3::RandomWalk2dMobilityModel::Speed", StringValue ("ns3::UniformRandomVariable[Min=1.0|Max=5.0]"));
   //Creating nodes
   nodes.Create(i);
-  
+
   //Adding Mobility to the created nodes
   MobilityHelper mobility;
-  int64_t streamIndex = 0; // used to get consistent mobility across scenarios
-  
-  ObjectFactory pos;
-  pos.SetTypeId ("ns3::RandomRectanglePositionAllocator");
-  pos.Set ("X", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max="+to_string(meters)+"]"));
-  pos.Set ("Y", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max="+to_string(meters)+"]"));
 
-  Ptr<PositionAllocator> taPositionAlloc = pos.Create ()->GetObject<PositionAllocator> ();
-  streamIndex += taPositionAlloc->AssignStreams (streamIndex);
-  
-  mobility.SetMobilityModel ("ns3::RandomWaypointMobilityModel",
-                              "Speed", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max=10.0]"),
-                              "Pause", StringValue ("ns3::ConstantRandomVariable[Constant=30]"),
-                              "PositionAllocator", PointerValue (taPositionAlloc));
-
-  mobility.SetPositionAllocator (taPositionAlloc);
-  
-  /*
   mobility.SetPositionAllocator ("ns3::GridPositionAllocator",
-                               "MinX", DoubleValue (0.0),
-                               "MinY", DoubleValue (0.0),
-                               "DeltaX", DoubleValue (250),
-                               "DeltaY", DoubleValue (250),
-                               "GridWidth", UintegerValue (10),
-                               "LayoutType", StringValue ("RowFirst"));
-  mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-  */
-  mobility.Install (nodes);
+  "MinX", DoubleValue (0.0),
+  "MinY", DoubleValue (0.0),
+  "DeltaX", DoubleValue (25),
+  "DeltaY", DoubleValue (25),
+  "GridWidth", UintegerValue (5),
+  "LayoutType", StringValue ("RowFirst"));
 
-  streamIndex += mobility.AssignStreams (nodes, streamIndex);
-  NS_UNUSED (streamIndex); // From this point, streamIndex is unused
+  mobility.SetMobilityModel ("ns3::RandomWalk2dMobilityModel", "Bounds", RectangleValue (Rectangle (-500,500,-500,500)));
+
+  //mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+
+  mobility.Install (nodes);
 };
 
 void
 RoutingExample::createDevices(){
-  std::string phyMode ("OfdmRate12Mbps");
   WifiMacHelper wifiMac;
   wifiMac.SetType ("ns3::AdhocWifiMac");
   YansWifiPhyHelper wifiPhy = YansWifiPhyHelper::Default ();
   YansWifiChannelHelper wifiChannel = YansWifiChannelHelper::Default ();
 
   wifiChannel.SetPropagationDelay ("ns3::ConstantSpeedPropagationDelayModel");
-  //wifiChannel.AddPropagationLoss ("ns3::TwoRayGroundPropagationLossModel");
   //wifiChannel.AddPropagationLoss ("ns3::LogDistancePropagationLossModel","Exponent", StringValue ("2.7"));
   
+  wifiPhy.Set ("RxSensitivity", DoubleValue (-89.0) );
+  wifiPhy.Set ("CcaEdThreshold", DoubleValue (-62.0) );
+  wifiPhy.Set ("TxGain", DoubleValue (1.0) );
+  wifiPhy.Set ("RxGain", DoubleValue (1.0) );
   wifiPhy.Set ("TxPowerLevels", UintegerValue (1) );
-  wifiPhy.Set ("TxPowerEnd", DoubleValue (36.66) );
-  wifiPhy.Set ("TxPowerStart", DoubleValue (36.66) );
+  wifiPhy.Set ("TxPowerEnd", DoubleValue (18) );
+  wifiPhy.Set ("TxPowerStart", DoubleValue (18) );
+  wifiPhy.Set ("RxNoiseFigure", DoubleValue (7.0) );
   
   wifiPhy.SetChannel (wifiChannel.Create ());
   
   WifiHelper wifi;
   wifi.SetStandard (WIFI_PHY_STANDARD_80211a);
-  wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager", "DataMode",StringValue (phyMode), "ControlMode",StringValue (phyMode));
+  wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager", "DataMode", StringValue ("OfdmRate6Mbps"), "RtsCtsThreshold", UintegerValue (0));
 
+  //WifiHelper wifi;
+  //wifi.SetStandard (WIFI_PHY_STANDARD_80211a);
+  //wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager", "DataMode", 
+  //StringValue ("OfdmRate6Mbps"), "RtsCtsThreshold", UintegerValue (2500));
   devices = wifi.Install (wifiPhy, wifiMac, nodes); 
 };
 
@@ -436,24 +427,33 @@ RoutingExample::installInternetStack(){
   //--------------------------------------------
   //--AODV Routing Protocol
   //--------------------------------------------
-  //routing.Set ("AllowedHelloLoss", UintegerValue (5));
-  //routing.Set ("RerrRateLimit", UintegerValue (3));
-  //routing.Set ("TtlIncrement", UintegerValue (4));
-  //routing.Set ("TtlThreshold", UintegerValue (14));
-  //routing.Set ("BlackListTimeout", TimeValue ( Seconds (0)));
-  stack.SetRoutingHelper (routing); // has effect on the next Install ()
-  stack.Install (nodes);
+  /*
+  routing.Set ("AllowedHelloLoss", UintegerValue (20));
+  routing.Set ("HelloInterval", TimeValue (Seconds (3)));
+  routing.Set ("RreqRetries", UintegerValue (5));
+  routing.Set ("ActiveRouteTimeout", TimeValue (Seconds (100)));
+  */
+  /*
+  routing.Set ("AllowedHelloLoss", UintegerValue (5));
+  routing.Set ("RerrRateLimit", UintegerValue (3));
+  routing.Set ("TtlIncrement", UintegerValue (4));
+  routing.Set ("TtlThreshold", UintegerValue (14));
+  */
+  //stack.SetRoutingHelper (routing); // has effect on the next Install ()
+  //stack.Install (nodes);
+
   //--------------------------------------------
   //--AODV Routing Protocol
   //--------------------------------------------
 
+
   //--------------------------------------------
   //--DSR Routing Protocol
   //--------------------------------------------
-  /*
+  
   stack.Install (nodes);
   dsrMain.Install (dsrrouting, nodes);
-  */
+  
   //--------------------------------------------
   //--DSR Routing Protocol
   //--------------------------------------------
@@ -463,8 +463,34 @@ RoutingExample::installInternetStack(){
   interfaces = address.Assign (devices);
 };
 
+/*
+void 
+RoutingExample::installApplications(){
+  
+  UdpEchoServerHelper echoServer (9);
+  
+  ApplicationContainer serverApps = echoServer.Install (nodes.Get (server_node));
+  UdpEchoClientHelper echoClient (interfaces.GetAddress (server_node), 9);
+  echoClient.SetAttribute ("MaxPackets", UintegerValue (max_packets));
+  //echoClient.SetAttribute ("Interval", TimeValue (packet_interval));
+  echoClient.SetAttribute ("PacketSize", UintegerValue (packet_size));
+  ApplicationContainer clientApps = echoClient.Install (nodes.Get (client_node));
+  PacketSinkHelper sinkHelper("ns3::UdpSocketFactory",  InetSocketAddress (interfaces.GetAddress (server_node), 9));
+  ApplicationContainer sinkApp = sinkHelper.Install (nodes.Get(server_node));
+  serverApps.Start (Seconds (1.0));
+  serverApps.Stop (Seconds (totalTime));
+  clientApps.Start (Seconds (1.0));
+  clientApps.Stop (Seconds (totalTime));
+  sink = StaticCast<PacketSink> (sinkApp.Get (server_node));
+  sinkApp.Start (Seconds (1.0));
+  sinkApp.Stop(Seconds(totalTime));
+};
+*/
+
 void 
 RoutingExample::installOnOffApplications(){
+
+  RngSeedManager::SetSeed(seed);
 
   //--------------------------------------
   //-- Stats Module START
@@ -484,7 +510,7 @@ RoutingExample::installOnOffApplications(){
   string experiment ("DSR-routing-test");
   string strategy ("wifi-default");
   string input;
-  string runID ("AODV");
+  string runID ("DSR");
 
   // Create a DataCollector object to hold information about this run.
   data.DescribeRun (experiment, strategy, input, runID);
@@ -515,9 +541,9 @@ RoutingExample::installOnOffApplications(){
     b->SetAttribute("Mean", DoubleValue(30));
     duration = b->GetInteger()+1;
 
-    if(duration < 20) duration = 20;
+    if(duration < 10) duration = 10;
     
-    if(start_time > 150) start_time = 150;
+    if(start_time > 165) start_time = 165;
 
     if ( (start_time + duration) > (totalTime - 10)){
       stop_time = totalTime-10;
@@ -535,7 +561,7 @@ RoutingExample::installOnOffApplications(){
       client_node = rand_nodes->GetInteger (0,size-1);
     }
 
-   /* 
+    
     // File pointer 
     std::fstream fin;
   
@@ -573,15 +599,14 @@ RoutingExample::installOnOffApplications(){
     }
     fin.close();
     row.clear();
-    */
     
-    duration = stop_time - start_time;
+	  duration = stop_time - start_time;
     total_connection_time += duration;
     
     // file pointer 
     std::fstream fout_tests;
     // opens an existing csv file or creates a new file. 
-    fout_tests.open("xml/connectionsVanetRC-AODV-OUT-330.csv", std::ios::out | std::ios::app);
+    fout_tests.open("xml/connectionsVanetRC-DSR-OUT-330.csv", std::ios::out | std::ios::app);
     uint32_t rownum = connections * (seed - 1) + i + 1;  
     // write csv
     fout_tests << rownum << "," << connections << "," << seed << "," << client_node << "," << server_node << "," << start_time << "," << stop_time << "\n";
@@ -639,22 +664,22 @@ RoutingExample::installOnOffApplications(){
 
 void
 RoutingExample::printingRoutingTable(){
-  
-  Time rtt1 = Seconds(75.0);
+  /*
+  Time rtt1 = Seconds(15.0);
   AsciiTraceHelper ascii1;
   Ptr<OutputStreamWrapper> rtw1 = ascii1.CreateFileStream ("xml/routing_table1");
   routing.PrintRoutingTableAllAt(rtt1,rtw1);
 
-  Time rtt2 = Seconds(80.0);
+  Time rtt2 = Seconds(16.0);
   AsciiTraceHelper ascii2;
   Ptr<OutputStreamWrapper> rtw2 = ascii2.CreateFileStream ("xml/routing_table2");
   routing.PrintRoutingTableAllAt(rtt2,rtw2);
   
-  Time rtt3 = Seconds(95.0);
+  Time rtt3 = Seconds(30.0);
   AsciiTraceHelper ascii3;
   Ptr<OutputStreamWrapper> rtw3 = ascii3.CreateFileStream ("xml/routing_table3");
   routing.PrintRoutingTableAllAt(rtt3,rtw3);
-  
+  */
 };
 
 void

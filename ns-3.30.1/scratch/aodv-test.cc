@@ -59,8 +59,8 @@ int main (int argc, char **argv)
 	                          "PositionAllocator", PointerValue (taPositionAlloc));
 	mobility.SetPositionAllocator (taPositionAlloc);
 	*/
+
 	mobility.Install (nodes);
-	
 
 	//-------------------------------------
 	//Creating Devices
@@ -72,8 +72,8 @@ int main (int argc, char **argv)
 	YansWifiChannelHelper wifiChannel = YansWifiChannelHelper::Default ();
 	wifiPhy.SetChannel (wifiChannel.Create ());
 	WifiHelper wifi;
-  	wifi.SetStandard (WIFI_PHY_STANDARD_80211a);
-  	wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager", "DataMode",StringValue ("DsssRate11Mbps"), "ControlMode",StringValue ("DsssRate11Mbps"));
+	wifi.SetStandard (WIFI_PHY_STANDARD_80211a);
+	//wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager", "DataMode", StringValue ("OfdmRate6Mbps"), "RtsCtsThreshold", UintegerValue (0));
 	devices = wifi.Install (wifiPhy, wifiMac, nodes); 
 	//Enable Pcap files
 	wifiPhy.EnablePcapAll (std::string ("aodv"));
@@ -83,6 +83,7 @@ int main (int argc, char **argv)
 	//-------------------------------------
 	Ipv4InterfaceContainer interfaces;
 	AodvHelper aodv;
+	aodv.Set ("BlackListTimeout", TimeValue ( Seconds (0)));
 	InternetStackHelper stack;
 	stack.SetRoutingHelper (aodv);
 	stack.Install (nodes);

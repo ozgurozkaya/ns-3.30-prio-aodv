@@ -382,7 +382,7 @@ RoutingExample::createNodes(int i){
   streamIndex += taPositionAlloc->AssignStreams (streamIndex);
   
   mobility.SetMobilityModel ("ns3::RandomWaypointMobilityModel",
-                              "Speed", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max=15.0]"),
+                              "Speed", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max=10.0]"),
                               "Pause", StringValue ("ns3::ConstantRandomVariable[Constant=30]"),
                               "PositionAllocator", PointerValue (taPositionAlloc));
 
@@ -538,7 +538,7 @@ RoutingExample::installOnOffApplications(){
       client_node = rand_nodes->GetInteger (0,size-1);
     }
 
-    /*
+   /* 
     // File pointer 
     std::fstream fin;
   

@@ -104,12 +104,11 @@ class RoutingExample{
     // argc & argv configuration
     void configuration(int argc, char ** argv);
     // Number of nodes
-    uint32_t size = 50;
-    uint32_t meters = 1000;
+    uint32_t size = 100;
     // Seed Value
     uint32_t seed = 1001;
     // Number of Connections
-    uint32_t connections = 10;
+    uint32_t connections = 20;
     // Seconds of Connections
     double total_connection_time = 0;
     Ptr<PacketCounterCalculator> totalRx[1000];
@@ -127,14 +126,15 @@ class RoutingExample{
     double duration;
     // Write per-device PCAP traces if true & net-anim file generate
     bool pcap = true;
+    bool anim = true;
     // Print routes if true
-    bool printRoutes = false;
+    bool printRoutes = true;
     //Size of Packet (bytes), Packet interval (Time), Max Packets
-    double packet_size = 512;
+    double packet_size = 1024;
     //Time packet_interval = MilliSeconds (1000);
     //double max_packets = 250;
-    StringValue data_rate = StringValue("5Kb/s");
-    double data_rate_2 = 5;
+    StringValue data_rate = StringValue("50Kb/s");
+    double data_rate_2 = 50;
     //Internet Stack Helper
     InternetStackHelper stack;
     //Pointer to the packet sink application 
@@ -145,8 +145,8 @@ class RoutingExample{
     AodvHelper routing;
     //OlsrHelper routing;
     //DsdvHelper routing;
-    DsrHelper dsrrouting;
-    DsrMainHelper dsrMain;
+    //DsrHelper dsrrouting;
+    //DsrMainHelper dsrMain;
     // you can configure AODV attributes here using aodv.Set(name, value)
 
   // network
@@ -176,8 +176,7 @@ class RoutingExample{
 
 void
 RoutingExample::run(){
-  RngSeedManager::SetSeed(seed);
-
+  
   createNodes(size);
   createDevices();
   installInternetStack();
@@ -192,9 +191,9 @@ RoutingExample::run(){
   file_path += std::to_string(connections);
   file_path += ".xml";
 
-  //std::string animFile = "xml/animation-AODV.xml";
-  //AnimationInterface animation (animFile);
-  //animation.SetMaxPktsPerTraceFile(500000);
+  std::string animFile = "xml/aodv-paper.xml";
+  AnimationInterface animation (animFile);
+  animation.SetMaxPktsPerTraceFile(500000);
 
   //Simulator::Schedule(Seconds(20), &changePosition, nodes.Get(0), Vector(500,500,0));
   Simulator::Stop (Seconds (totalTime));
@@ -261,7 +260,7 @@ RoutingExample::run(){
       // We are only interested in the metrics of the data flows. This AODV
       // implementation create other flows with routing information at low bitrates,
       // so a margin is defined to ensure that only our data flows are filtered.
-      if ( (!t.destinationAddress.IsSubnetDirectedBroadcast("255.255.255.0")) && (txbitrate_value > 5/1.2) && (rxbitrate_value < 5*1.2)  && txbitrate_value != inf)
+      if ( (!t.destinationAddress.IsSubnetDirectedBroadcast("255.255.255.0")) && (txbitrate_value > 50/1.2) && (rxbitrate_value < 50*1.2)  && txbitrate_value != inf)
       {
           k++;
           std::cout << "\nFlow " << k << " (" << t.sourceAddress << " -> "
@@ -344,7 +343,7 @@ RoutingExample::run(){
   output->Output(data);
 
   data_rate_2 = data_rate_2 * 1000; // turning Kb to bits
-  double pdf_total_statsModule = delayStat[0]->GetTotal() / floor(total_connection_time * (data_rate_2 / (packet_size * 8))) * 100;
+  double pdf_total_statsModule = delayStat[0]->GetTotal() / (total_connection_time * (data_rate_2 / (packet_size * 8))) * 100;
   std::cout << "\n" << total_connection_time << "\n" << pdf_total_statsModule << "\n";
   
   // file pointer 
@@ -361,7 +360,6 @@ void RoutingExample::configuration(int argc, char ** argv){
   cmd.AddValue("size", "Number of nodes", size);
   cmd.AddValue("seed", "Value of seed", seed);
   cmd.AddValue("connections", "Number of connections", connections);
-  cmd.AddValue("meters", "One side of square as meters", meters);
   cmd.Parse (argc, argv);
 }
 
@@ -372,60 +370,62 @@ RoutingExample::createNodes(int i){
   
   //Adding Mobility to the created nodes
   MobilityHelper mobility;
-  int64_t streamIndex = 0; // used to get consistent mobility across scenarios
-  
+
   ObjectFactory pos;
   pos.SetTypeId ("ns3::RandomRectanglePositionAllocator");
-  pos.Set ("X", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max="+to_string(meters)+"]"));
-  pos.Set ("Y", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max="+to_string(meters)+"]"));
+  pos.Set ("X", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max=300.0]"));
+  pos.Set ("Y", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max=1500.0]"));
 
   Ptr<PositionAllocator> taPositionAlloc = pos.Create ()->GetObject<PositionAllocator> ();
-  streamIndex += taPositionAlloc->AssignStreams (streamIndex);
   
   mobility.SetMobilityModel ("ns3::RandomWaypointMobilityModel",
                               "Speed", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max=10.0]"),
-                              "Pause", StringValue ("ns3::ConstantRandomVariable[Constant=30]"),
+                              "Pause", StringValue ("ns3::ConstantRandomVariable[Constant=20]"),
                               "PositionAllocator", PointerValue (taPositionAlloc));
 
   mobility.SetPositionAllocator (taPositionAlloc);
   
   /*
+  MobilityHelper mobility;
+
   mobility.SetPositionAllocator ("ns3::GridPositionAllocator",
-                               "MinX", DoubleValue (0.0),
-                               "MinY", DoubleValue (0.0),
-                               "DeltaX", DoubleValue (250),
-                               "DeltaY", DoubleValue (250),
-                               "GridWidth", UintegerValue (10),
-                               "LayoutType", StringValue ("RowFirst"));
+  "MinX", DoubleValue (0.0),
+  "MinY", DoubleValue (0.0),
+  "DeltaX", DoubleValue (250),
+  "DeltaY", DoubleValue (250),
+  "GridWidth", UintegerValue (5),
+  "LayoutType", StringValue ("RowFirst"));
+
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   */
-  mobility.Install (nodes);
 
-  streamIndex += mobility.AssignStreams (nodes, streamIndex);
-  NS_UNUSED (streamIndex); // From this point, streamIndex is unused
+  mobility.Install (nodes);
 };
 
 void
 RoutingExample::createDevices(){
-  std::string phyMode ("OfdmRate12Mbps");
   WifiMacHelper wifiMac;
   wifiMac.SetType ("ns3::AdhocWifiMac");
   YansWifiPhyHelper wifiPhy = YansWifiPhyHelper::Default ();
   YansWifiChannelHelper wifiChannel = YansWifiChannelHelper::Default ();
 
   wifiChannel.SetPropagationDelay ("ns3::ConstantSpeedPropagationDelayModel");
-  //wifiChannel.AddPropagationLoss ("ns3::TwoRayGroundPropagationLossModel");
   //wifiChannel.AddPropagationLoss ("ns3::LogDistancePropagationLossModel","Exponent", StringValue ("2.7"));
   
+  //wifiPhy.Set ("RxSensitivity", DoubleValue (-89.0) );
+  //wifiPhy.Set ("CcaEdThreshold", DoubleValue (-62.0) );
+  //wifiPhy.Set ("TxGain", DoubleValue (1.0) );
+  //wifiPhy.Set ("RxGain", DoubleValue (1.0) );
   wifiPhy.Set ("TxPowerLevels", UintegerValue (1) );
   wifiPhy.Set ("TxPowerEnd", DoubleValue (36.66) );
   wifiPhy.Set ("TxPowerStart", DoubleValue (36.66) );
+  //wifiPhy.Set ("RxNoiseFigure", DoubleValue (7.0) );
   
   wifiPhy.SetChannel (wifiChannel.Create ());
   
   WifiHelper wifi;
   wifi.SetStandard (WIFI_PHY_STANDARD_80211a);
-  wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager", "DataMode",StringValue (phyMode), "ControlMode",StringValue (phyMode));
+  wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager", "DataMode", StringValue ("OfdmRate6Mbps"), "RtsCtsThreshold", UintegerValue (0));
 
   devices = wifi.Install (wifiPhy, wifiMac, nodes); 
 };
@@ -441,7 +441,7 @@ RoutingExample::installInternetStack(){
   //routing.Set ("TtlIncrement", UintegerValue (4));
   //routing.Set ("TtlThreshold", UintegerValue (14));
   //routing.Set ("BlackListTimeout", TimeValue ( Seconds (0)));
-  stack.SetRoutingHelper (routing); // has effect on the next Install ()
+  stack.SetRoutingHelper (routing);
   stack.Install (nodes);
   //--------------------------------------------
   //--AODV Routing Protocol
@@ -466,6 +466,8 @@ RoutingExample::installInternetStack(){
 void 
 RoutingExample::installOnOffApplications(){
 
+  RngSeedManager::SetSeed(seed);
+
   //--------------------------------------
   //-- Stats Module START
   //--------------------------------------
@@ -476,7 +478,6 @@ RoutingExample::installOnOffApplications(){
   for(uint32_t tmpi = 0; tmpi < nodes.GetN(); tmpi++){
       PacketSinkHelper sinkHelper ("ns3::UdpSocketFactory", InetSocketAddress (Ipv4Address::GetAny (), 9));
       apps_sink[tmpi] = sinkHelper.Install (nodes.Get (tmpi));
-      //sink = StaticCast<PacketSink> (apps_sink[tmpi].Get(0));
       apps_sink[tmpi].Start (Seconds (0));
       apps_sink[tmpi].Stop (Seconds (180));
     }
@@ -515,9 +516,9 @@ RoutingExample::installOnOffApplications(){
     b->SetAttribute("Mean", DoubleValue(30));
     duration = b->GetInteger()+1;
 
-    if(duration < 20) duration = 20;
+    if(duration < 10) duration = 10;
     
-    if(start_time > 150) start_time = 150;
+    if(start_time > 165) start_time = 165;
 
     if ( (start_time + duration) > (totalTime - 10)){
       stop_time = totalTime-10;
@@ -535,7 +536,7 @@ RoutingExample::installOnOffApplications(){
       client_node = rand_nodes->GetInteger (0,size-1);
     }
 
-   /* 
+    /*
     // File pointer 
     std::fstream fin;
   
@@ -574,8 +575,7 @@ RoutingExample::installOnOffApplications(){
     fin.close();
     row.clear();
     */
-    
-    duration = stop_time - start_time;
+	  duration = stop_time - start_time;
     total_connection_time += duration;
     
     // file pointer 
@@ -661,19 +661,6 @@ void
 RoutingExample::enablePcapTracing(){
   stack.EnablePcapIpv4All ("xml/pcap/internet"); // gets pcap files of all nodes
 }
-
-/*
-void
-RoutingExample::calculateThroughput(){
-  
-  Time now = Simulator::Now ();                                               // Return the simulator's virtual time.
-  double cur = (sink[0]->GetTotalRx () - lastTotalRx) * (double) 8 / 1e5;     // Convert Application RX Packets to MBits.
-  std::cout << now.GetSeconds () << "s: \t" << cur << " Mbit/s" << std::endl;
-  lastTotalRx = sink[0]->GetTotalRx ();
-  //Simulator::Schedule (MilliSeconds (100), &RoutingExample::calculateThroughput);
-  
-}
-*/
 
 int
 main (int argc, char *argv[])
